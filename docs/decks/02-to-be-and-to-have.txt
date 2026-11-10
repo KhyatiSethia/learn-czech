@@ -1,0 +1,14 @@
+# title: Být and mít
+# description: Fill the gap with the right present-tense form of "to be" or "to have".
+Já ___ student. (to be) | jsem
+Ty ___ unavený. (to be) | jsi
+Ona ___ doma. (to be) | je
+My ___ v Praze. (to be) | jsme
+Vy ___ z Anglie? (to be) | jste
+Oni ___ ve škole. (to be) | jsou
+Já ___ novou knihu. (to have) | mám
+Ty ___ čas? (to have) | máš
+On ___ bratra. (to have) | má
+My ___ auto. (to have) | máme
+Vy ___ hlad? (to have) | máte
+Oni ___ psa. (to have) | mají

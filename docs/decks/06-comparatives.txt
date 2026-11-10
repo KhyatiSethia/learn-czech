@@ -1,0 +1,17 @@
+# title: Comparatives
+# description: The "-er" form of common adjectives. Several are irregular.
+bigger (velký) | větší
+smaller (malý) | menší
+better (dobrý) | lepší | irregular
+worse (špatný) | horší | irregular
+older (starý) | starší
+younger (mladý) | mladší
+longer (dlouhý) | delší
+shorter (krátký) | kratší
+cheaper (levný) | levnější
+more expensive (drahý) | dražší
+faster (rychlý) | rychlejší
+slower (pomalý) | pomalejší
+more beautiful (krásný) | krásnější
+taller (vysoký) | vyšší
+prettier (hezký) | hezčí

@@ -1,0 +1,22 @@
+# title: Everyday phrases
+# description: Greetings and polite expressions. English prompt, Czech answer.
+Good day (formal hello) | Dobrý den
+Hi, or bye (informal) | Ahoj | Works for both hello and goodbye
+Good morning | Dobré ráno
+Good evening | Dobrý večer
+Good night | Dobrou noc
+Thank you | Děkuji / Děkuju / Díky | Děkuju is the spoken form
+Please, or you're welcome | Prosím
+Excuse me, or sorry (formal) | Promiňte
+How are you? (informal) | Jak se máš?
+How are you? (formal) | Jak se máte?
+Nice to meet you | Těší mě
+I don't understand. | Nerozumím.
+Do you speak English? (formal) | Mluvíte anglicky?
+How much is it? | Kolik to stojí?
+Cheers! | Na zdraví!
+Goodbye (formal) | Na shledanou
+My name is Anna. | Jmenuji se Anna. / Jmenuju se Anna.
+I live in Ostrava. | Bydlím v Ostravě.
+I would like a beer. | Dal bych si pivo. / Dala bych si pivo.
+Where is the toilet? | Kde je toaleta? / Kde je záchod?

@@ -1,0 +1,32 @@
+{
+  "name": "learn-czech",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Czech grammar notes, playful exercises from your own workbook, and an offline tutor that runs in the browser.",
+  "scripts": {
+    "dev": "vitepress dev docs",
+    "build": "vitepress build docs",
+    "preview": "vitepress preview docs",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@types/markdown-it": "^14.2.0",
+    "@vite-pwa/vitepress": "^2.0.3",
+    "magicast": "^0.5.5",
+    "typescript": "^7.0.2",
+    "vitepress": "^1.6.4",
+    "vitest": "^5.1.0",
+    "vue": "^3.5.45"
+  },
+  "dependencies": {
+    "@fontsource-variable/source-serif-4": "^5.3.1",
+    "@fontsource/barlow-semi-condensed": "^5.3.0",
+    "@mlc-ai/web-llm": "^0.2.88",
+    "markdown-it": "^15.0.3"
+  },
+  "engines": {
+    "node": ">=22.14"
+  },
+  "license": "MIT"
+}

@@ -1,0 +1,14 @@
+# title: Case endings
+# description: Put the word in brackets into the case the sentence needs.
+Vidím ___. (žena) | ženu | accusative
+Dávám dárek ___. (matka) | matce | dative
+Bydlím v ___. (Praha) | Praze | locative
+Jdu do ___. (škola) | školy | genitive
+Mluvím o ___. (kniha) | knize | locative
+Jedu s ___. (kamarád) | kamarádem | instrumental
+Jsem z ___. (Německo) | Německa | genitive, after z
+Pijeme kávu s ___. (mléko) | mlékem | instrumental
+Jdu k ___. (lékař) | lékaři | dative
+Čekám na ___. (autobus) | autobus | accusative, and an inanimate masculine noun looks the same as the nominative
+Vidím ___. (bratr) | bratra | accusative, animate
+Jsem v ___. (město) | městě | locative

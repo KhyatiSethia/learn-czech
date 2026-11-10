@@ -1,0 +1,11 @@
+# title: Conditional: bych, bys, by
+# description: The "would" particle changes with the person. Fill in the missing form.
+Já ___ šel domů. (I would go) | bych
+Ty ___ šel domů? (you would go) | bys
+On ___ šel domů. (he would go) | by
+My ___ šli domů. (we would go) | bychom
+Vy ___ šli domů? (you would go, plural or formal) | byste
+Oni ___ šli domů. (they would go) | by
+Chtěl ___ si koupit auto. (I would like to buy a car) | bych
+Kdybych ___ čas, přišel bych. (if I had time) | měl / měla
+Kdyby pršelo, ___ doma. (we would stay at home) | zůstali bychom

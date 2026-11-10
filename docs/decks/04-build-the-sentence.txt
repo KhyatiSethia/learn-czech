@@ -1,0 +1,12 @@
+# title: Build the sentence
+# description: Short sentences to assemble word by word. Best played in "Build it" mode.
+I live in Prague. | Bydlím v Praze.
+Where do you work? | Kde pracuješ? / Kde pracujete?
+I would like a coffee. | Dal bych si kávu. / Dala bych si kávu.
+I don't speak Czech well. | Nemluvím dobře česky.
+We are going to the cinema. | Jdeme do kina.
+She has a big dog. | Má velkého psa.
+Yesterday I was at home. | Včera jsem byl doma. / Včera jsem byla doma.
+Tomorrow I will read a book. | Zítra budu číst knihu.
+Prague is bigger than Ostrava. | Praha je větší než Ostrava.
+If I had time, I would come. | Kdybych měl čas, přišel bych. / Kdybych měla čas, přišla bych.
