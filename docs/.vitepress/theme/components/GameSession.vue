@@ -2,20 +2,26 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import type { Item } from '../lib/types'
 import type { Prefs } from '../lib/store'
-import { Session, hintFor, type AnswerResult, type Summary, type Tile } from '../lib/session'
+import { Session, hintFor, shuffle, type AnswerResult, type Summary, type Tile } from '../lib/session'
 import { normalize } from '../lib/text'
+import { detectLang, type Lang } from '../lib/lang'
+import { initSpeech, speak, speakableAnswer, speakableQuestion, stopSpeaking, useSpeech } from '../lib/speech'
 import { sounds } from '../lib/sound'
 import { burst } from '../lib/confetti'
 import { openTutor } from '../lib/tutor'
 import DiaText from './DiaText.vue'
 import CzechKeys from './CzechKeys.vue'
 import TramRoute from './TramRoute.vue'
+import SpeakButton from './SpeakButton.vue'
+import AudioNotice from './AudioNotice.vue'
 
 const props = defineProps<{
   title: string
   items: Item[]
   pool: Item[]
   prefs: Prefs
+  /** Language of the questions and of the answers, when the set says. Guessed per item otherwise. */
+  langs?: { q: Lang; a: Lang }
 }>()
 
 const emit = defineEmits<{
@@ -30,6 +36,7 @@ const session = reactive(
     mode: props.prefs.mode,
     hearts: props.prefs.hearts,
     strict: props.prefs.strict,
+    noTyping: props.prefs.noTyping,
   }),
 ) as Session
 
@@ -40,6 +47,7 @@ const answer = ref('')
 const picked = ref<string | null>(null)
 const built = ref<Tile[]>([])
 const hintText = ref('')
+const eliminated = ref<string[]>([])
 const feedback = ref<AnswerResult | null>(null)
 const summary = ref<Summary | null>(null)
 const leaving = ref(false)
@@ -88,6 +96,38 @@ const canCheck = computed(() => {
 const usedIds = computed(() => new Set(built.value.map((t) => t.id)))
 const answerKeys = computed(() => new Set((shown.value?.item.a ?? []).map(normalize)))
 const isRight = (opt: string) => answerKeys.value.has(normalize(opt))
+const hinted = computed(() => !!hintText.value || eliminated.value.length > 0)
+const canRemove = computed(() => kind.value === 'choice' && (shown.value?.options ?? []).length - eliminated.value.length > 2)
+
+// ---- audio ----
+const sp = useSpeech()
+const audioOn = computed(() => props.prefs.audio && sp.supported.value)
+const STRIP_GAP = /_{3,}|[.…·]{2,}/gu
+
+function answerLang(item: Item): Lang {
+  if (props.langs) return props.langs.a
+  const sentence = item.say || (/_{3,}/.test(item.q) ? item.q.replace(STRIP_GAP, ' ') + ' ' + item.a[0] : item.a[0])
+  return detectLang(sentence, 'cs')
+}
+function questionLang(item: Item): Lang {
+  if (/_{3,}/.test(item.q)) return answerLang(item)
+  return props.langs ? props.langs.q : detectLang(item.q, 'en')
+}
+const questionSpeech = computed(() => (shown.value ? speakableQuestion(shown.value.item.q) : ''))
+const questionLangNow = computed(() => (shown.value ? questionLang(shown.value.item) : 'en'))
+const answerSpeech = computed(() => {
+  const f = feedback.value
+  return f ? speakableAnswer(f.item.q, f.expected, f.item.say) : ''
+})
+const answerLangNow = computed(() => (feedback.value ? answerLang(feedback.value.item) : 'cs'))
+const missedSpeech = (m: Item) => speakableAnswer(m.q, m.a[0], m.say)
+const voices = () => ({ cs: props.prefs.csVoice, en: props.prefs.enVoice })
+
+function playAnswerAutomatically() {
+  if (!audioOn.value || !props.prefs.autoPlay || !feedback.value) return
+  void speak(answerSpeech.value, answerLangNow.value, { id: 'answer', rate: props.prefs.rate, voices: voices() })
+}
+
 const alsoAccepted = computed(() => (feedback.value?.item.a ?? []).filter((a) => a !== feedback.value?.expected))
 
 function resetInputs() {
@@ -95,6 +135,7 @@ function resetInputs() {
   picked.value = null
   built.value = []
   hintText.value = ''
+  eliminated.value = []
   feedback.value = null
 }
 
@@ -105,7 +146,15 @@ function focusSoon() {
 }
 
 function showHint() {
-  if (shown.value && !hintText.value) hintText.value = hintFor(shown.value.item)
+  const ch = shown.value
+  if (!ch || feedback.value) return
+  if (ch.kind === 'choice') {
+    // Take away one wrong option instead of spelling out the answer.
+    const wrong = (ch.options ?? []).filter((o) => !isRight(o) && !eliminated.value.includes(o))
+    if (wrong.length && canRemove.value) eliminated.value = [...eliminated.value, shuffle(wrong)[0]]
+    return
+  }
+  if (!hintText.value) hintText.value = hintFor(ch.item)
 }
 
 function insertChar(ch: string) {
@@ -121,9 +170,10 @@ function insertChar(ch: string) {
 }
 
 function pick(opt: string) {
-  if (feedback.value) return
+  if (feedback.value || eliminated.value.includes(opt)) return
   picked.value = opt
   if (props.prefs.sound) sounds.tick()
+  if (props.prefs.quickPick) check()
 }
 function place(t: Tile) {
   if (feedback.value || usedIds.value.has(t.id)) return
@@ -139,7 +189,7 @@ function check() {
   const ch = shown.value
   if (!ch || !canCheck.value) return
   const response = ch.kind === 'type' ? answer.value : ch.kind === 'choice' ? (picked.value as string) : built.value.map((t) => t.text)
-  const result = session.submit(response, !!hintText.value)
+  const result = session.submit(response, hinted.value)
   feedback.value = result
 
   if (result.verdict === 'wrong') {
@@ -152,11 +202,13 @@ function check() {
     if (session.streak > 0 && session.streak % 5 === 0) burst(confettiEl.value, 60, { x: 0.5, y: 0.85 })
   }
   nextTick(() => continueEl.value?.focus({ preventScroll: true }))
+  playAnswerAutomatically()
 }
 
 function next() {
   if (!feedback.value) return
   const wasFinished = feedback.value.finished
+  stopSpeaking()
   resetInputs()
   if (wasFinished) {
     finish()
@@ -187,6 +239,7 @@ function askLeave() {
 }
 
 const cards = computed(() => summary.value?.missed ?? [])
+const quickHere = computed(() => props.prefs.quickPick && kind.value === 'choice')
 
 function onKey(e: KeyboardEvent) {
   if (e.isComposing) return
@@ -216,11 +269,13 @@ function onKey(e: KeyboardEvent) {
 }
 
 onMounted(() => {
+  initSpeech()
   window.addEventListener('keydown', onKey)
   document.documentElement.style.overflow = 'hidden'
   focusSoon()
 })
 onBeforeUnmount(() => {
+  stopSpeaking()
   window.removeEventListener('keydown', onKey)
   document.documentElement.style.overflow = ''
 })
@@ -252,14 +307,18 @@ onBeforeUnmount(() => {
       <p class="kind">{{ kindLabel }}</p>
 
       <div class="prompt" :class="{ shake: shaking, hit: feedback && feedback.verdict !== 'wrong' }">
-        <p v-if="!fill" class="q"><DiaText :text="shown.item.q" /></p>
-        <p v-else class="q">
-          <DiaText :text="fill.before" /><span class="gap" :class="gapClass"
-            ><DiaText v-if="gapValue" :text="gapValue" /><i v-else aria-label="blank">&nbsp;</i></span
-          ><DiaText :text="fill.after" />
-        </p>
-        <p v-if="hintText" class="hint"><span>Hint</span> {{ hintText }}</p>
+        <div class="prompt-main">
+          <p v-if="!fill" class="q"><DiaText :text="shown.item.q" /></p>
+          <p v-else class="q">
+            <DiaText :text="fill.before" /><span class="gap" :class="gapClass"
+              ><DiaText v-if="gapValue" :text="gapValue" /><i v-else aria-label="blank">&nbsp;</i></span
+            ><DiaText :text="fill.after" />
+          </p>
+          <p v-if="hintText" class="hint"><span>Hint</span> {{ hintText }}</p>
+        </div>
+        <SpeakButton v-if="audioOn && questionSpeech" id="question" :text="questionSpeech" :lang="questionLangNow" label="Hear the question" />
       </div>
+      <AudioNotice />
 
       <div class="answer">
         <template v-if="kind === 'type'">
@@ -289,8 +348,9 @@ onBeforeUnmount(() => {
                 picked: picked === opt && !feedback,
                 right: feedback && isRight(opt),
                 wrong: feedback && picked === opt && !isRight(opt),
+                gone: eliminated.includes(opt),
               }"
-              :disabled="!!feedback"
+              :disabled="!!feedback || eliminated.includes(opt)"
               @click="pick(opt)"
             >
               <kbd>{{ i + 1 }}</kbd>
@@ -357,7 +417,10 @@ onBeforeUnmount(() => {
           <li v-for="m in cards" :key="m.id">
             <span class="mq">{{ m.q }}</span>
             <span class="ma"><DiaText :text="m.a[0]" /></span>
-            <button type="button" class="link" @click="askTutorAbout(m, m.a[0])">Ask the tutor</button>
+            <span class="mact">
+              <SpeakButton v-if="audioOn" small :id="`missed:${m.id}`" :text="missedSpeech(m)" :lang="answerLang(m)" label="Hear the answer" />
+              <button type="button" class="link" @click="askTutorAbout(m, m.a[0])">Ask the tutor</button>
+            </span>
           </li>
         </ul>
       </div>
@@ -372,9 +435,11 @@ onBeforeUnmount(() => {
 
     <footer v-if="!summary" class="bar" :class="feedback ? feedback.verdict : ''">
       <div v-if="!feedback" class="bar-inner">
-        <button type="button" class="ghost" :disabled="!!hintText" @click="showHint">Hint</button>
-        <span class="tip">Enter to check</span>
-        <button type="button" class="primary" :disabled="!canCheck" @click="check">Check</button>
+        <button type="button" class="ghost" :disabled="kind === 'choice' ? !canRemove : !!hintText" @click="showHint">
+          {{ kind === 'choice' ? 'Remove one' : 'Hint' }}
+        </button>
+        <span class="tip">{{ quickHere ? 'Tap an answer to check it' : 'Enter to check' }}</span>
+        <button v-if="!quickHere" type="button" class="primary" :disabled="!canCheck" @click="check">Check</button>
       </div>
 
       <div v-else class="bar-inner sheet" role="status" aria-live="polite">
@@ -416,6 +481,7 @@ onBeforeUnmount(() => {
         </div>
 
         <div class="acts">
+          <SpeakButton v-if="audioOn" id="answer" :text="answerSpeech" :lang="answerLangNow" label="Hear the answer" />
           <button
             v-if="feedback.verdict !== 'correct'"
             type="button"
@@ -554,6 +620,15 @@ onBeforeUnmount(() => {
   border-color: var(--cz-green);
   animation: pop 0.28s;
 }
+.prompt {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+}
+.prompt-main {
+  flex: 1;
+  min-width: 0;
+}
 .q {
   margin: 0;
   font: 500 clamp(24px, 4.2vw, 34px) / 1.35 var(--vp-font-family-serif, 'Source Serif 4 Variable', Georgia, serif);
@@ -679,6 +754,15 @@ onBeforeUnmount(() => {
 }
 .choice:disabled {
   cursor: default;
+}
+.choice.gone {
+  opacity: 0.35;
+  text-decoration: line-through;
+}
+.mact {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
 .built {

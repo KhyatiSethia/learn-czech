@@ -1,14 +1,29 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import type { Deck, Mode } from '../lib/types'
 import type { Prefs } from '../lib/store'
 import { wordsOf } from '../lib/session'
+import { initSpeech, useSpeech } from '../lib/speech'
+import { withBase } from 'vitepress'
 
 const props = defineProps<{ deck: Deck; prefs: Prefs }>()
 const emit = defineEmits<{ start: []; close: []; change: [] }>()
 
 const dlg = ref<HTMLDialogElement | null>(null)
-onMounted(() => dlg.value?.showModal())
+const sp = useSpeech()
+onMounted(() => {
+  dlg.value?.showModal()
+  initSpeech()
+})
+
+// Typing is switched off, so "Type it" cannot stay selected.
+watch(
+  () => props.prefs.noTyping,
+  (off) => {
+    if (off && props.prefs.mode === 'type') props.prefs.mode = 'mixed'
+  },
+  { immediate: true },
+)
 
 const canChoose = computed(() => props.deck.items.length >= 3)
 const canBuild = computed(() => props.deck.items.some((i) => wordsOf(i.a[0]).length >= 3))
@@ -20,7 +35,12 @@ const MODES: { value: Mode; name: string; note: string }[] = [
   { value: 'tiles', name: 'Build it', note: 'Put words in order' },
 ]
 function disabled(m: Mode) {
-  return (m === 'choice' && !canChoose.value) || (m === 'tiles' && !canBuild.value)
+  return (m === 'choice' && !canChoose.value) || (m === 'tiles' && !canBuild.value) || (m === 'type' && props.prefs.noTyping)
+}
+function noteFor(m: { value: Mode; note: string }) {
+  if (!disabled(m.value)) return m.note
+  if (m.value === 'type') return 'Off while typing is off'
+  return m.value === 'tiles' ? 'Needs answers of 3+ words' : 'Needs 3+ questions'
 }
 const LENGTHS = [
   { value: 5, name: '5' },
@@ -45,7 +65,7 @@ const count = computed(() => (props.prefs.length ? Math.min(props.prefs.length, 
           <label v-for="m in MODES" :key="m.value" class="opt" :class="{ off: disabled(m.value) }">
             <input v-model="prefs.mode" type="radio" name="mode" :value="m.value" :disabled="disabled(m.value)" />
             <span class="name">{{ m.name }}</span>
-            <span class="note">{{ disabled(m.value) ? (m.value === 'tiles' ? 'Needs answers of 3+ words' : 'Needs 3+ questions') : m.note }}</span>
+            <span class="note">{{ noteFor(m) }}</span>
           </label>
         </div>
       </fieldset>
@@ -61,9 +81,33 @@ const count = computed(() => (props.prefs.length ? Math.min(props.prefs.length, 
       </fieldset>
 
       <fieldset class="switches">
-        <label><input v-model="prefs.hearts" type="checkbox" /> <span><b>Three hearts.</b> Each miss costs one; the run ends at zero.</span></label>
-        <label><input v-model="prefs.strict" type="checkbox" /> <span><b>Strict marks.</b> Treat <i lang="cs">č</i> and <i>c</i> as different letters.</span></label>
+        <legend>How you answer</legend>
+        <label><input v-model="prefs.noTyping" type="checkbox" /> <span><b>Pick, never type.</b> Every question is a choice or a sentence to build.</span></label>
+        <label><input v-model="prefs.quickPick" type="checkbox" /> <span><b>Tap to answer.</b> Choosing an option checks it at once, with no Check button.</span></label>
+        <label :class="{ off: prefs.noTyping }">
+          <input v-model="prefs.strict" type="checkbox" :disabled="prefs.noTyping" />
+          <span><b>Strict marks</b> when typing. Treat <i lang="cs">č</i> and <i>c</i> as different letters.</span>
+        </label>
+      </fieldset>
+
+      <fieldset class="switches">
+        <legend>Sound</legend>
+        <label><input v-model="prefs.audio" type="checkbox" /> <span><b>Audio.</b> A speaker button on every question and answer.</span></label>
+        <label :class="{ off: !prefs.audio }">
+          <input v-model="prefs.autoPlay" type="checkbox" :disabled="!prefs.audio" />
+          <span><b>Read the answer aloud</b> after each question.</span>
+        </label>
         <label><input v-model="prefs.sound" type="checkbox" /> <span><b>Sound effects.</b></span></label>
+        <p v-if="prefs.audio && sp.supported.value && sp.missingCzech.value" class="warn">
+          This device has no Czech voice, so Czech audio will not play.
+          <a :href="withBase('/listen#voices')" target="_blank" rel="noopener">How to add one</a>
+        </p>
+        <p v-else-if="prefs.audio && !sp.supported.value" class="warn">This browser cannot read text aloud.</p>
+      </fieldset>
+
+      <fieldset class="switches">
+        <legend>Challenge</legend>
+        <label><input v-model="prefs.hearts" type="checkbox" /> <span><b>Three hearts.</b> Each miss costs one; the run ends at zero.</span></label>
       </fieldset>
 
       <footer>
@@ -178,6 +222,23 @@ legend {
 .switches {
   display: grid;
   gap: 10px;
+}
+.switches label.off {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.warn {
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: var(--cz-yellow-soft);
+  font: 500 15px/1.4 var(--cz-ui);
+}
+.warn a {
+  color: var(--cz-blue);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 .switches label {
   display: flex;

@@ -16,6 +16,19 @@ export interface Prefs {
   hearts: boolean
   strict: boolean
   sound: boolean
+  /** Only pick or build answers; never type. */
+  noTyping: boolean
+  /** Tapping an answer checks it straight away, with no Check button. */
+  quickPick: boolean
+  /** Show speaker buttons and read sentences aloud. */
+  audio: boolean
+  /** Read the full sentence aloud after each answer. */
+  autoPlay: boolean
+  /** Speech speed, 1 is normal. */
+  rate: number
+  /** Voice names chosen by the learner; empty means the best one found. */
+  csVoice: string
+  enVoice: string
 }
 export interface DeckBest {
   stars: number
@@ -30,7 +43,20 @@ export interface Stats {
   best: Record<string, DeckBest>
 }
 
-const defaultPrefs = (): Prefs => ({ mode: 'mixed', length: 10, hearts: false, strict: false, sound: true })
+const defaultPrefs = (): Prefs => ({
+  mode: 'mixed',
+  length: 10,
+  hearts: false,
+  strict: false,
+  sound: true,
+  noTyping: true,
+  quickPick: false,
+  audio: true,
+  autoPlay: true,
+  rate: 0.9,
+  csVoice: '',
+  enVoice: '',
+})
 const defaultStats = (): Stats => ({ xp: 0, sessions: 0, streakDays: 0, lastDay: '', best: {} })
 
 const userDecks = ref<Deck[]>([])

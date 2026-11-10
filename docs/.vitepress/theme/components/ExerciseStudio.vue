@@ -38,12 +38,14 @@ const bestOf = (id: string) => stats.value.best[id]
 
 // ---- create / edit ----
 const importing = ref<{ deck?: Deck } | null>(null)
-function saveImported(d: { id?: string; title: string; description?: string; items: Item[] }) {
+function saveImported(d: Pick<Deck, 'title' | 'description' | 'items' | 'langs' | 'workbook'> & { id?: string }) {
   store.saveDeck({
     id: d.id ?? store.newDeckId(),
     title: d.title,
     description: d.description,
     items: d.items,
+    langs: d.langs,
+    workbook: d.workbook,
     source: 'user',
   })
   importing.value = null
@@ -108,7 +110,7 @@ function onDone(summary: Summary) {
       <div class="intro">
         <h1>Practice</h1>
         <p>
-          Pick a set, or build one from your own workbook. A question you miss comes back a few questions later, so it sticks.
+          Pick a set, or build one from your own workbook. You can answer by tapping, and every sentence can be read aloud. A question you miss comes back a few questions later, so it sticks.
         </p>
       </div>
       <dl v-if="ready" class="you">
@@ -164,7 +166,7 @@ function onDone(summary: Summary) {
     </ol>
 
     <p v-if="ready && !userDecks.length" class="empty">
-      Nothing of your own here yet. Copy the question and answer columns from a workbook, choose
+      Nothing of your own here yet. Copy an exercise and its answers from a workbook, choose
       <b>Create exercises from a workbook</b>, and paste them in. They stay in this browser.
     </p>
     <p class="fine">
@@ -179,6 +181,7 @@ function onDone(summary: Summary) {
       :title="run.deck.title"
       :items="run.items"
       :pool="run.deck.items"
+      :langs="run.deck.langs"
       :prefs="prefs"
       @exit="run = null"
       @again="again"

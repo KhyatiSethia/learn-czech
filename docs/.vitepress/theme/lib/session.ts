@@ -20,6 +20,8 @@ export interface SessionOptions {
   mode: Mode
   hearts: boolean
   strict: boolean
+  /** Never ask for typed answers: every question is a pick-one or a build-the-sentence. */
+  noTyping?: boolean
 }
 
 export interface AnswerResult {
@@ -80,22 +82,36 @@ export function pickItems(items: Item[], boxes: Record<string, number>, count: n
   return scored.slice(0, count).map((s) => s.it)
 }
 
+/**
+ * Wrong answers to offer next to the right one. Answers of other questions in the same group
+ * (for example other forms of jít/chodit) come first because they are the realistic mix-ups;
+ * after that, answers of a similar length from the rest of the set.
+ */
 export function distractorsFor(item: Item, pool: Item[], n: number, rng: Rng = Math.random): string[] {
   const own = new Set(item.a.map(normalize))
   const seen = new Set<string>()
-  const cands: string[] = []
+  const same: string[] = []
+  const rest: string[] = []
   for (const p of pool) {
     if (p.id === item.id) continue
     const a = p.a[0]
     const k = normalize(a)
     if (!k || own.has(k) || seen.has(k)) continue
     seen.add(k)
-    cands.push(a)
+    ;(item.group && p.group === item.group ? same : rest).push(a)
   }
   const len = wordsOf(item.a[0]).length
-  const near = cands.filter((c) => Math.abs(wordsOf(c).length - len) <= 1)
-  const far = cands.filter((c) => !near.includes(c))
-  return [...shuffle(near, rng), ...shuffle(far, rng)].slice(0, n)
+  const near = rest.filter((c) => Math.abs(wordsOf(c).length - len) <= 1)
+  const far = rest.filter((c) => !near.includes(c))
+  return [...shuffle(same, rng), ...shuffle(near, rng), ...shuffle(far, rng)].slice(0, n)
+}
+
+/** The choices printed in the workbook, if the item has them and the right answer is one of them. */
+function printedOptions(item: Item): string[] | null {
+  const opts = item.options
+  if (!opts || opts.length < 2) return null
+  const right = new Set(item.a.map(normalize))
+  return opts.some((o) => right.has(normalize(o))) ? opts : null
 }
 
 export function buildTiles(item: Item, pool: Item[], rng: Rng = Math.random): Tile[] {
@@ -125,25 +141,30 @@ export function buildTiles(item: Item, pool: Item[], rng: Rng = Math.random): Ti
   return tiles
 }
 
-function chooseKind(item: Item, pool: Item[], mode: Mode, attempt: number, rng: Rng): ChallengeKind {
+function chooseKind(item: Item, pool: Item[], mode: Mode, attempt: number, rng: Rng, noTyping: boolean): ChallengeKind {
   const wordCount = wordsOf(item.a[0]).length
-  const canTiles = wordCount >= 3 && wordCount <= 12
-  const canChoice = distractorsFor(item, pool, 3, rng).length >= 2
+  const printed = !!printedOptions(item)
+  const canTiles = !printed && wordCount >= 3 && wordCount <= 12
+  const canChoice = printed || distractorsFor(item, pool, 3, rng).length >= 2
+  // Without typing, anything that cannot be a pick or a build still has to be typed. It is rare:
+  // it only happens for a set of fewer than three questions.
+  const noType = (): ChallengeKind => (canChoice ? 'choice' : canTiles ? 'tiles' : 'type')
   switch (mode) {
     case 'type':
-      return 'type'
+      return noTyping ? noType() : 'type'
     case 'choice':
-      return canChoice ? 'choice' : 'type'
+      return canChoice ? 'choice' : noTyping ? noType() : 'type'
     case 'tiles':
-      return canTiles ? 'tiles' : 'type'
+      return canTiles ? 'tiles' : canChoice && noTyping ? 'choice' : noTyping ? noType() : 'type'
     default: {
       if (attempt > 0) return canTiles ? 'tiles' : canChoice ? 'choice' : 'type'
       const weights: [ChallengeKind, number][] = [
-        ['type', 2],
+        ['type', noTyping ? 0 : 2],
         ['choice', canChoice ? 2 : 0],
         ['tiles', canTiles ? 3 : 0],
       ]
       const total = weights.reduce((s, [, w]) => s + w, 0)
+      if (total === 0) return 'type'
       let r = rng() * total
       for (const [kind, w] of weights) {
         if ((r -= w) < 0) return kind
@@ -153,10 +174,14 @@ function chooseKind(item: Item, pool: Item[], mode: Mode, attempt: number, rng: 
   }
 }
 
-export function buildChallenge(item: Item, pool: Item[], mode: Mode, attempt = 0, rng: Rng = Math.random): Challenge {
-  const kind = chooseKind(item, pool, mode, attempt, rng)
+export function buildChallenge(item: Item, pool: Item[], mode: Mode, attempt = 0, rng: Rng = Math.random, noTyping = false): Challenge {
+  const kind = chooseKind(item, pool, mode, attempt, rng, noTyping)
   const ch: Challenge = { key: `${item.id}:${attempt}`, item, kind, attempt }
-  if (kind === 'choice') ch.options = shuffle([item.a[0], ...distractorsFor(item, pool, 3, rng)], rng)
+  if (kind === 'choice') {
+    const printed = printedOptions(item)
+    // Keep the workbook's own order for printed choices, so they match what the book shows.
+    ch.options = printed ? printed.slice() : shuffle([item.a[0], ...distractorsFor(item, pool, 3, rng)], rng)
+  }
   if (kind === 'tiles') ch.tiles = buildTiles(item, pool, rng)
   return ch
 }
@@ -186,7 +211,7 @@ export class Session {
     this.opts = opts
     this.rng = rng
     this.total = items.length
-    this.queue = items.map((it) => buildChallenge(it, pool, opts.mode, 0, rng))
+    this.queue = items.map((it) => buildChallenge(it, pool, opts.mode, 0, rng, !!opts.noTyping))
   }
 
   get current(): Challenge | undefined {
@@ -233,7 +258,7 @@ export class Session {
         if (this.lives <= 0) this.failed = true
       }
       if (ch.attempt < MAX_RETRIES) {
-        const next = buildChallenge(ch.item, this.pool, this.opts.mode, ch.attempt + 1, this.rng)
+        const next = buildChallenge(ch.item, this.pool, this.opts.mode, ch.attempt + 1, this.rng, !!this.opts.noTyping)
         this.queue.splice(Math.min(2, this.queue.length), 0, next)
         retry = true
       } else {

@@ -20,6 +20,8 @@ hero:
 
 **Aiming for A2?** Work through [the cases](/grammar/cases), [past and future](/grammar/verbs-past-future), [the conditional](/grammar/conditional) and [comparing things](/grammar/comparison). Then drill them in [the exercises](/practice/).
 
-**Have a workbook?** Copy its questions and answers into [the exercise studio](/practice/). Each row becomes a typing, multiple choice or sentence-building question, with points and streaks to keep it moving.
+**Have a workbook?** Copy an exercise and its answer key into [the exercise studio](/practice/). Each sentence becomes a question you answer by tapping, with a speaker button, points and streaks to keep it moving.
+
+**Want to hear Czech?** Paste any text into [Listen](/listen) and have it read aloud, in Czech or English, one sentence at a time.
 
 **Stuck on a sentence?** Open the tutor from the top bar and paste it in. It explains in English. The model runs in your browser, and once it has been downloaded it works without internet. See [how the tutor works](/tutor).

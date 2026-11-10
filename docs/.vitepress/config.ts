@@ -25,6 +25,7 @@ const config = defineConfig({
     nav: [
       { text: 'Grammar', link: '/grammar/', activeMatch: '/grammar/' },
       { text: 'Practice', link: '/practice/', activeMatch: '/practice/' },
+      { text: 'Listen', link: '/listen' },
       { text: 'Tutor', link: '/tutor' },
     ],
     sidebar: {

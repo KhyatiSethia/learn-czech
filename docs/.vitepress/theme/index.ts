@@ -9,6 +9,7 @@ import './style.css'
 import Layout from './Layout.vue'
 import ExerciseStudio from './components/ExerciseStudio.vue'
 import DiaText from './components/DiaText.vue'
+import TextReader from './components/TextReader.vue'
 
 export default {
   extends: DefaultTheme,
@@ -16,5 +17,6 @@ export default {
   enhanceApp({ app }) {
     app.component('ExerciseStudio', ExerciseStudio)
     app.component('DiaText', DiaText)
+    app.component('TextReader', TextReader)
   },
 } satisfies Theme

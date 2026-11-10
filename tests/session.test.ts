@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { parseDeckText } from '../docs/.vitepress/theme/lib/parse'
+import { parseWorkbook } from '../docs/.vitepress/theme/lib/workbook'
 import { Session, buildChallenge, buildTiles, distractorsFor, hintFor, pickItems } from '../docs/.vitepress/theme/lib/session'
 
 const deck = parseDeckText(`
@@ -162,5 +163,72 @@ describe('hintFor', () => {
   it('uses the author hint when present and the answer shape otherwise', () => {
     expect(hintFor({ id: '1', q: 'q', a: ['Dobrou noc'], hint: 'evening' })).toBe('evening')
     expect(hintFor({ id: '1', q: 'q', a: ['Dobrou noc'] })).toBe('D·····  n··')
+  })
+})
+
+describe('pick-the-answer (no typing)', () => {
+  const wb = parseWorkbook(
+    'a) Kam ...... (jít – chodit) večer s kamarády?\nb) Zítra ...... (jet – jezdit) do Brna.\nc) Ty ...... (jít – chodit) rád do kina?\nd) My ...... (jet – jezdit) k moři autem.\ne) Já ...... (jít – chodit) už domů.\n\n* a) chodíš, b) jedu, c) chodíš, d) jedeme, e) jdu',
+  ).items
+
+  it('has five items, with the two verb pairs in separate groups', () => {
+    expect(wb).toHaveLength(5)
+    expect(wb[0].group).toBe(wb[2].group)
+    expect(wb[0].group).not.toBe(wb[1].group)
+  })
+
+  it('offers answers from the same verb pair as the wrong choices', () => {
+    const kam = wb[0]
+    for (let i = 0; i < 20; i++) {
+      const d = distractorsFor(kam, wb, 3, seeded(i + 1))
+      // jdu is the only other jít/chodit answer, and chodíš (the same answer) is never a distractor
+      expect(d[0]).toBe('jdu')
+      expect(d).not.toContain('chodíš')
+    }
+  })
+
+  it('never asks for typing in any mode when noTyping is on', () => {
+    for (const mode of ['mixed', 'type', 'choice', 'tiles'] as const) {
+      for (let i = 0; i < 20; i++) {
+        const ch = buildChallenge(wb[i % wb.length], wb, mode, 0, seeded(i + 3), true)
+        expect(ch.kind).not.toBe('type')
+        if (ch.kind === 'choice') expect(ch.options).toContain(wb[i % wb.length].a[0])
+      }
+    }
+  })
+
+  it('still types in "type" mode when noTyping is off', () => {
+    expect(buildChallenge(wb[0], wb, 'type', 0, seeded(1), false).kind).toBe('type')
+  })
+
+  it('only falls back to typing when the set is too small to make choices', () => {
+    const tiny = wb.slice(0, 2)
+    expect(buildChallenge(tiny[0], tiny, 'mixed', 0, seeded(1), true).kind).toBe('type')
+  })
+
+  it('keeps the workbook options in their printed order', () => {
+    const r = parseWorkbook('1. Dnes ...... do kina. a) jdu b) jedu c) chodím\n2. Včera ...... do Prahy. a) šel b) jel c) jede\n\nKlíč: 1a 2b')
+    const ch = buildChallenge(r.items[1], r.items, 'mixed', 0, seeded(9), true)
+    expect(ch.kind).toBe('choice')
+    expect(ch.options).toEqual(['šel', 'jel', 'jede'])
+  })
+
+  it('plays through a whole run without a single typed answer', () => {
+    const s = new Session(wb, wb, { mode: 'mixed', hearts: false, strict: false, noTyping: true }, seeded(5))
+    let guard = 0
+    while (!s.finished && guard++ < 50) {
+      const ch = s.current!
+      expect(ch.kind).not.toBe('type')
+      s.submit(ch.kind === 'tiles' ? ch.item.a[0].split(' ') : ch.item.a[0])
+    }
+    expect(s.summary().firstTry).toBe(5)
+    expect(s.summary().stars).toBe(3)
+  })
+
+  it('grades a wrong pick as wrong', () => {
+    const s = new Session(wb.slice(0, 1), wb, { mode: 'choice', hearts: false, strict: false, noTyping: true }, seeded(2))
+    const r = s.submit('jedeme')
+    expect(r.verdict).toBe('wrong')
+    expect(r.retry).toBe(true)
   })
 })
